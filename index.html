@@ -159,22 +159,24 @@ const KEY='storybuilder:v1';
 const $=s=>document.querySelector(s);
 const M=$('#modal');
 const CATS={
-  characters:{label:'Characters',one:'character',title:'name',sub:['role','jobTitle'],photo:true,photoAfter:2,tagsTop:true,rel:true,
+  characters:{label:'Characters',one:'character',title:'name',sub:'role',photo:true,photoAfter:2,tagsTop:true,rel:true,
     sections:[
       {fields:[['name','Name','i'],['role','Role','i'],['quote','Quote','a']]},
+      {head:'Plot',fields:[['goal','Goals','a'],['conflict','Conflicts','a']]},
       {head:'Basics',fields:[['age','Age','i'],['pronouns','Pronouns','i'],['birthday','Birthday','i']]},
       {head:'Appearance',fields:[['height','Height','i'],['weight','Weight','i'],['eyeColor','Eye color','i'],['hairColor','Hair color','i'],['bodyType','Body type','i'],['features','Unique features','a']]},
       {head:'Identity',fields:[['zodiac','Zodiac sign','i'],['mbti','MBTI type','i'],['sexOri','Sexual orientation','i'],['romOri','Romantic orientation','i'],['relType','Relationship type','i'],['relStatus','Relationship status','i'],['religion','Religious beliefs','a'],['politics','Political beliefs','a'],['philosophy','Philosophical beliefs','a'],['personality','Personality','a'],['likes','Likes','a'],['dislikes','Dislikes','a']]},
-      {head:'Career',fields:[['jobTitle','Title','i'],['employer','Employer','i'],['jobDesc','Job description','a']]}
+      {head:'Career',fields:[['jobTitle','Title','i'],['employer','Employer','i'],['jobDesc','Job description','a']]},
+      {head:'Notes',fields:[['notes','','a']]}
     ],
-    legacy:[['appearance','Appearance','a'],['notes','Notes','a']]},
-  locations:{label:'Locations',one:'location',title:'name',sub:'description',photo:true,photoAfter:1,tagsTop:true,scene:true,
+    legacy:[['appearance','Appearance','a']]},
+  locations:{label:'Locations',one:'location',title:'name',sub:null,photo:true,photoAfter:1,tagsTop:true,scene:true,
     sections:[
       {fields:[['name','Name','i']]},
       {head:'Basics',fields:[['description','Description','a'],['history','History','a']]}
     ],
     legacy:[['notes','Notes','a']]},
-  dictionary:{label:'Dictionary',one:'term',title:'term',sub:'definition',tagsTop:true,
+  dictionary:{label:'Dictionary',one:'term',title:'term',sub:'partOfSpeech',tagsTop:true,
     sections:[
       {fields:[['term','Term','i']]},
       {fields:[['partOfSpeech','Parts of speech','i'],['pronunciation','Pronunciation','i'],['examples','Example sentences','a'],['definition','Definition','a'],['history','History','a']]}
@@ -182,7 +184,7 @@ const CATS={
     legacy:[['notes','Notes','a']]}
 };
 Object.values(CATS).forEach(c=>{if(c.sections)c.fields=c.sections.flatMap(x=>x.fields)});
-const RELS=[['familial','Familial'],['platonic','Platonic'],['romantic','Romantic'],['antagonistic','Antagonistic']];
+const RELS=[['familial','Familial'],['platonic','Platonic'],['romantic','Romantic'],['antagonistic','Antagonistic'],['occupational','Occupational']];
 const relOf=e=>{const r=(e&&e.rel)||{},o={};RELS.forEach(([k])=>o[k]=[...(r[k]||[])]);return o};
 function linkRel(o,k,id,on){
   const r=relOf(o),has=r[k].includes(id);
@@ -196,7 +198,7 @@ function syncRels(p,id,oldRel,newRel){
   });
 }
 function symAll(p){p.characters.forEach(a=>{const r=relOf(a);RELS.forEach(([k])=>r[k].forEach(b=>{const o=p.characters.find(x=>x.id===b);if(o)linkRel(o,k,a.id,true)}))})}
-const subText=(e,c)=>[].concat(c.sub).map(k=>e[k]).find(Boolean)||'';
+const subText=(e,c)=>!c.sub?'':[].concat(c.sub).map(k=>e[k]).find(Boolean)||'';
 let S;
 try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 if(!S||!Array.isArray(S.projects))S={theme:'dark',projects:[]};
@@ -297,7 +299,7 @@ function photoBox(msg){
   const id=view.draftPhoto;
   return `${id&&S.images[id]?`<img class="iphoto" src="${S.images[id]}" alt="">`:''}<div class="bkbtns" style="margin:0 0 4px"><button class="btn" data-act="pickphoto">${id?'Replace photo':'Add photo'}</button>${id?'<button class="btn" data-act="rmphoto">Remove photo</button>':''}</div>${msg?`<p class="bkst">${esc(msg)}</p>`:''}<input type="file" id="photofile" accept="image/*" hidden>`;
 }
-function fieldHtml(k,l,t,e){return `<label class="fl" for="f-${k}">${l}</label>${t==='a'?`<textarea id="f-${k}" data-k="${k}" rows="${k==='quote'?2:4}">${esc(e[k]||'')}</textarea>`:`<input id="f-${k}" data-k="${k}" value="${esc(e[k]||'')}" autocomplete="off">`}`}
+function fieldHtml(k,l,t,e){return `${l?`<label class="fl" for="f-${k}">${l}</label>`:''}${t==='a'?`<textarea id="f-${k}" data-k="${k}" rows="${k==='quote'?2:4}"${l?'':` aria-label="${esc(k)}" style="margin-top:12px"`}>${esc(e[k]||'')}</textarea>`:`<input id="f-${k}" data-k="${k}" value="${esc(e[k]||'')}" autocomplete="off">`}`}
 function backLabel(){
   const p=proj();
   if(view.trail.length){const t=view.trail[view.trail.length-1],prev=p[t.tab]&&p[t.tab].find(x=>x.id===t.id);return esc((prev&&prev[CATS[t.tab].title])||'Back')}
@@ -368,7 +370,7 @@ function item(){
   const tagsHtml=tg.length?`<div class="label">Tags</div><div class="chips" style="margin:14px 0 26px">${tg.map(t=>`<span class="chip">${icon(t,16)}${esc(t.name)}</span>`).join('')}</div>`:'';
   let body;
   if(c.sections){
-    const kv=([k,l])=>`<div class="kv"><span class="k">${l}</span><span class="v">${esc(e[k])}</span></div>`;
+    const kv=([k,l])=>l?`<div class="kv"><span class="k">${l}</span><span class="v">${esc(e[k])}</span></div>`:`<p class="val" style="margin:10px 0 0">${esc(e[k])}</p>`;
     const old=(c.legacy||[]).filter(([k])=>e[k]);
     body=(e.role?`<p class="rolel">${esc(e.role)}</p>`:'')+(e.quote?`<blockquote class="quote">${esc(e.quote)}</blockquote>`:'')+tagsHtml+
       c.sections.slice(1).map(sec=>{const rows=sec.fields.filter(([k])=>e[k]).map(kv).join('');return rows?(sec.head?`<div class="label">${sec.head}</div>`:'')+`<div class="sec">${rows}</div>`:''}).join('')+
